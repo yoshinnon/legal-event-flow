@@ -1,0 +1,1 @@
+# eventbridge モジュール変数

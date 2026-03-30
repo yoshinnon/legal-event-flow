@@ -1,0 +1,28 @@
+{
+  "name": "legal-event-flow-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test":  "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-eventbridge":   "^3",
+    "@aws-sdk/client-dynamodb":      "^3",
+    "@aws-sdk/lib-dynamodb":         "^3",
+    "@aws-sdk/client-s3":            "^3",
+    "@aws-sdk/client-secrets-manager": "^3",
+    "@aws-sdk/client-lambda":        "^3",
+    "pg":                            "^8"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8",
+    "@types/pg":         "^8",
+    "@types/node":       "^20",
+    "esbuild":           "^0.21",
+    "jest":              "^29",
+    "ts-jest":           "^29",
+    "typescript":        "^5"
+  }
+}

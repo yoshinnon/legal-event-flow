@@ -1,0 +1,131 @@
+# deploy.yml — main push時の全体デプロイ
+# terraform → deploy-backend → migrate → deploy-frontend
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    outputs:
+      cloudfront_id: ${{ steps.tf_output.outputs.cloudfront_id }}
+      api_endpoint:  ${{ steps.tf_output.outputs.api_endpoint }}
+      s3_bucket:     ${{ steps.tf_output.outputs.s3_bucket }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve -var="github_repo=${{ github.repository }}"
+      - name: Capture outputs
+        id: tf_output
+        working-directory: ./terraform
+        run: |
+          echo "cloudfront_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+          echo "api_endpoint=$(terraform output -raw api_gateway_endpoint)"         >> $GITHUB_OUTPUT
+          echo "s3_bucket=$(terraform output -raw s3_bucket_name)"                 >> $GITHUB_OUTPUT
+
+  deploy-backend:
+    name: Deploy Lambda Functions
+    needs: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - name: Build
+        working-directory: ./backend
+        run: npm ci && npm run build
+      - name: Deploy each Lambda
+        working-directory: ./backend
+        run: |
+          PROJECT=legal-event-flow
+          ENV=dev
+          for fn in api-handler scheduler-handler consumer-handler migrate-handler; do
+            cd dist/$fn
+            # migrate-handler には migrations/ ディレクトリを同梱
+            if [ "$fn" = "migrate-handler" ]; then
+              cp -r ../../migrations ./migrations
+            fi
+            zip -r ../$fn.zip .
+            cd ../..
+            aws lambda update-function-code \
+              --function-name ${PROJECT}-${ENV}-${fn} \
+              --zip-file fileb://dist/$fn.zip
+          done
+
+  migrate:
+    name: Run DB Migration
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+      - name: Invoke migrate-handler
+        run: |
+          aws lambda invoke \
+            --function-name legal-event-flow-dev-migrate-handler \
+            --invocation-type RequestResponse \
+            --log-type Tail \
+            --query 'LogResult' \
+            --output text \
+            response.json | base64 -d
+          cat response.json
+          # Lambdaがエラーを返した場合はCIを失敗させる
+          if grep -q '"errorMessage"' response.json; then
+            echo "Migration failed!" && exit 1
+          fi
+
+  deploy-frontend:
+    name: Deploy React to S3
+    needs: terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build
+        working-directory: ./frontend
+        env:
+          VITE_API_ENDPOINT: ${{ needs.terraform.outputs.api_endpoint }}
+        run: npm ci && npm run build
+      - name: S3 Sync
+        run: |
+          aws s3 sync frontend/dist/ s3://${{ needs.terraform.outputs.s3_bucket }} --delete
+      - name: CloudFront Invalidation
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ needs.terraform.outputs.cloudfront_id }} \
+            --paths "/*"
