@@ -11,6 +11,9 @@
 - **IaC**: Terraform（全リソース管理）
 - **CI/CD**: GitHub Actions（OIDC認証）
 
+## Configration Diagram
+![diagram](images/diagram.jpg)
+
 ## Getting Started
 
 ### 前提条件
