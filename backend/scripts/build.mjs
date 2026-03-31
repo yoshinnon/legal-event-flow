@@ -1,9 +1,10 @@
-// esbuild で各 Lambda を dist/{fn}/index.js にバンドル
 import * as esbuild from "esbuild";
-import { readdirSync } from "fs";
+import { readdirSync, cpSync, mkdirSync } from "fs";
+import { join } from "path";
 
 const handlers = readdirSync("src");
 
+// esbuild でバンドル
 await Promise.all(
   handlers.map((fn) =>
     esbuild.build({
@@ -12,10 +13,17 @@ await Promise.all(
       platform:    "node",
       target:      "node20",
       outfile:     `dist/${fn}/index.js`,
-      external:    ["pg-native"],  // pg のネイティブバインディングは除外
+      external:    ["pg-native"],
       sourcemap:   false,
       minify:      true,
+      // shared/ をパスエイリアス解決
+      alias:       { "../../shared": join(process.cwd(), "shared") },
     })
   )
 );
-console.log("Build complete.");
+
+// migrate-handler には migrations/ を同梱
+const migrationsOut = "dist/migrate-handler/migrations";
+mkdirSync(migrationsOut, { recursive: true });
+cpSync("migrations", migrationsOut, { recursive: true });
+console.log("✅ Build complete. migrations/ copied to dist/migrate-handler/.");

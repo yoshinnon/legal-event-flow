@@ -3,18 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "test":  "jest",
+    "build":     "node scripts/build.mjs",
+    "test":      "jest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-eventbridge":   "^3",
-    "@aws-sdk/client-dynamodb":      "^3",
-    "@aws-sdk/lib-dynamodb":         "^3",
-    "@aws-sdk/client-s3":            "^3",
-    "@aws-sdk/client-secrets-manager": "^3",
-    "@aws-sdk/client-lambda":        "^3",
-    "pg":                            "^8"
+    "@aws-sdk/client-eventbridge":    "^3",
+    "@aws-sdk/client-dynamodb":       "^3",
+    "@aws-sdk/lib-dynamodb":          "^3",
+    "@aws-sdk/client-s3":             "^3",
+    "@aws-sdk/client-secrets-manager":"^3",
+    "pg": "^8"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8",

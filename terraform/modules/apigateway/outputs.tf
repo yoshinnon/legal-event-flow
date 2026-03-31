@@ -1,1 +1,2 @@
-# apigateway モジュール出力
+output "endpoint"       { value = aws_apigatewayv2_stage.main.invoke_url }
+output "execution_arn"  { value = aws_apigatewayv2_api.main.execution_arn }
