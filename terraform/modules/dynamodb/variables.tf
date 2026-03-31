@@ -1,1 +1,2 @@
-# dynamodb モジュール変数
+variable "project_name" { type = string }
+variable "environment"  { type = string }

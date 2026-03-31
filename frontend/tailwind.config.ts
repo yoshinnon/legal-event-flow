@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import typography from "@tailwindcss/typography";
 
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -11,7 +12,18 @@ export default {
           700: "#334155",
         },
       },
+      keyframes: {
+        "slide-up": {
+          "0%":   { transform: "translateY(100%)", opacity: "0" },
+          "100%": { transform: "translateY(0)",    opacity: "1" },
+        },
+      },
+      animation: {
+        "slide-up": "slide-up 0.2s ease-out",
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    typography,
+  ],
 } satisfies Config;
