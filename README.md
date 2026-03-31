@@ -11,6 +11,9 @@
 - **IaC**: Terraform（全リソース管理）
 - **CI/CD**: GitHub Actions（OIDC認証）
 
+## Diagram
+![diagram](images/diagram.jpg)
+
 ## Database Design
 
 本システムは性質の異なる2種類のデータを、それぞれ最適なDBに分けて管理しています。
